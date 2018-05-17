@@ -40,6 +40,18 @@ void serialWrite(unsigned char DataOut)
 	UDR = DataOut;
 }
 
+unsigned char serialCheckRxComplete(void)
+{
+	return( UCSRA & _BV(RXC)) ;		// nonzero if serial data is available to read.
+}
+
+unsigned char serialRead(void)
+{
+	while (serialCheckRxComplete() == 0)		// While data is NOT available to read
+	{;;} 
+	return UDR;
+}
+
 int sendByte(char byte){
 
 	int bit;
@@ -144,11 +156,18 @@ int waitP(){
 int main(void)
 {
 
-	int rcvByte = 0;
-	uart_init();
+    int rcvByte = 0;
+    char SR;
+    uart_init();
 
-	DDRB &= 0xFE; //set PB0 to input
-	GO_HI;
+    DDRB &= 0xFE; //set PB0 to input
+    GO_HI;
+
+
+    while(1){
+
+      SR = serialRead();
+      if (SR == 'r'){
 
 	sendR();
 	waitP();
@@ -162,28 +181,20 @@ int main(void)
 	for (rcvByte=0; rcvByte < 8; rcvByte++){
 		serialWrite(numToHex(data[rcvByte]/16));
 		serialWrite(numToHex(data[rcvByte]%16));
-		data[rcvByte] = 0;
 	}
 	serialWrite('\r');
 	serialWrite('\n');
+      } else if (SR == 'w'){
 
-	_delay_ms(16);
 	sendR();
 	waitP();
+	sendByte(0xD5);
 
 	// table 3
 
-	sendByte(0xD5);
-
-	writeByte(0x01);
-	writeByte(0x02);
-	writeByte(0x03);
-	writeByte(0x04);
-	writeByte(0x05);
-	writeByte(0x06);
-	writeByte(0x07);
-	writeByte(0x08);
-
+	for (rcvByte=0; rcvByte < 8; rcvByte++){
+		writeByte(data[rcvByte]);
+	}
 
 	sendR();
 	waitP();
@@ -204,9 +215,12 @@ int main(void)
 	for (rcvByte=0; rcvByte < 8; rcvByte++){
 		serialWrite(numToHex(data[rcvByte]/16));
 		serialWrite(numToHex(data[rcvByte]%16));
-		data[rcvByte] = 0;
 	}
 	serialWrite('\r');
 	serialWrite('\n');
+      } else {
+	serialWrite('!');
+      }
+    }
 
 }
